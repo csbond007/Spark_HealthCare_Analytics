@@ -43,10 +43,10 @@ object Main {
 
         val emr_labscorepopulated_rdd = sc.cassandraTable("emrbots_data", "emr_labscorepopulated")
         
-        println("/////////////////////////////////////// " + emr_labscorepopulated_rdd.count())
+        //println("/////////////////////////////////////// " + emr_labscorepopulated_rdd.count())
         
         // Total number of records in this table = 107535277
-        //emr_labscorepopulated_rdd.take(20).foreach(println)
+        emr_labscorepopulated_rdd.take(20).foreach(println)
 
       
 
