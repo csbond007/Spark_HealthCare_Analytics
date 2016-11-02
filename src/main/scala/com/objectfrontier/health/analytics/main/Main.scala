@@ -27,11 +27,16 @@ import org.apache.spark.mllib.tree.GradientBoostedTrees
 import org.apache.spark.mllib.tree.configuration.BoostingStrategy
 import org.apache.spark.mllib.tree.model.GradientBoostedTreesModel
 
+import com.typesafe.config.ConfigFactory
+
 object Main {
   def main(args: Array[String]) {
 
+    val config = ConfigFactory.load()
+    val cassandraConnectionHost = config.getString("cassandra.connection.host")
+
     val conf = new SparkConf(true)
-        .set("spark.cassandra.connection.host", "10.10.40.138")
+        .set("spark.cassandra.connection.host", cassandraConnectionHost)
         .setAppName(this.getClass.getSimpleName)
         //  .setMaster("spark://10.10.40.138:7077")
         // .setMaster("mesos://zk://10.10.40.138:2181/mesos")

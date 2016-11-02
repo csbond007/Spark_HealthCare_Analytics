@@ -17,6 +17,8 @@ libraryDependencies += "com.datastax.spark" % "spark-cassandra-connector_2.11" %
 
 libraryDependencies += "com.datastax.cassandra" % "cassandra-driver-core" % "3.1.1"
 
+libraryDependencies += "com.typesafe" % "config" % "1.2.0"
+
 jarName in assembly :="healthCare-analytics.jar"
 
 assemblyOption in assembly := (assemblyOption in assembly).value.copy(includeScala = false)
