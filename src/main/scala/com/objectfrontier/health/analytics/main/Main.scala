@@ -1,9 +1,6 @@
 package com.objectfrontier.health.analytics.main
 
 
-import com.google.common.collect.ImmutableMap;
-
-
 //// Basic Spark Library
 import org.apache.spark.SparkContext
 import org.apache.spark.SparkContext._
@@ -33,144 +30,97 @@ import org.apache.spark.mllib.tree.model.GradientBoostedTreesModel
 
 import com.objectfrontier.health.analytics.context.ApplicationSparkContext
 import com.objectfrontier.health.analytics.dataframe.DataFrameGenerator
-import com.objectfrontier.health.analytics.cql.tables.UCI_Remote_Monitoring
+import com.objectfrontier.health.analytics.constants.ApplicationConstants
+import com.objectfrontier.health.analytics.algorithms.RandomForestAlgorithm
 
 object Main {
 	def main(args: Array[String]) {
 
 		val sc =  ApplicationSparkContext.getApplicationSparkContext()
 
-		// Spark-SQL Context
-				val sqlCtx = new SQLContext(sc)
+				var dataFrameObj : DataFrameGenerator = new DataFrameGenerator(new SQLContext(sc),
+						ApplicationConstants.KEYSPACE_UCI,
+						ApplicationConstants.UCI_PROTOCOLSUBJECT109);
 
-		var dataFrameObj : DataFrameGenerator = new DataFrameGenerator(sqlCtx,
-				UCI_Remote_Monitoring.keyspace,
-				UCI_Remote_Monitoring.protocol_subject_109);
+		val df_imputed = dataFrameObj.getUCIImputedDataframe()
 
-				val df = dataFrameObj.getDataFrame();
-
-				// Remove Time_Stamp Column here as it is non-important attribute
-				val df_minus_timestamp = df.drop("time_stamp")
-
-						/**
-						 * Imputation Code has to go here
-						 */
-
-						// HACK - Replaced value NA with 141
-						//val df1 = df_minus_timestamp.distinct()
+				val df_prepared = dataFrameObj.getUCIPreparedDataframe(df_imputed)
 
 
-						val df1 = df_minus_timestamp.na.replace("heart_rate", ImmutableMap.of("NA", "0"));
-				val df_imputed = df1.filter("heart_rate != 0")
-
-						println("&&&&&&&&&&&&&&&&&&&&&&&&&  =  " + df_imputed.count())
-						//df_imputed.
-
-						def encodeLabel=udf((activity_id: Double) => {
-							activity_id match {
-							case 1 => 0.0 
-							case 2 => 1.0
-							case 3 => 2.0
-							case 4 => 3.0
-							case 5 => 4.0
-							case 6 => 5.0
-							case 7 => 6.0
-							case 9 => 7.0
-							case 10 => 8.0
-							case 11 => 9.0
-							case 12 => 10.0
-							case 13 => 11.0
-							case 16 => 12.0
-							case 17 => 13.0
-							case 18 => 14.0
-							case 19 => 15.0
-							case 20 => 16.0
-							case 24 => 17.0
-							//case 0 => 18.0
-							case _ => 18.0
-							}})
-
-							def toVec4 =udf((heart_rate: Double,
-									IMU_hand_temperature: Double) => {
-										Vectors.dense(heart_rate,
-												IMU_hand_temperature)})
+				println("&&&&&&&&&&&&&&&&&&&&&&&&&  =  " + df_prepared.count())
+				//df_imputed.
 
 
-												val df_mod = df_imputed.withColumn(
-														"features",
-														toVec4(
-																df_imputed("heart_rate"),
-																df_imputed("IMU_hand_temperature"))
-														).withColumn("label", encodeLabel(df_imputed("activity_id")))
-														.select("features", "label")
 
-														df_mod.show(10)   
+				df_prepared.show(10)   
 
-														val splits = df_mod.randomSplit(Array(0.7, 0.3))
+				//////////////////////////////////////////////////////////////////////////////
 
-														val (training_split, test_split) = (splits(0), splits(1))
+      val (trainingData, testData) = get_Training_Testing_Data(df_prepared)
 
-														val trainingData = training_split.rdd.map(row => LabeledPoint(
-																row.getAs[Double]("label"),
-																row.getAs[org.apache.spark.mllib.linalg.Vector]("features")
-																))
+				
 
-																println("+++++++++++++++++++++++++++++++++++++++++++++++++++++" + trainingData.count()) 
+								//  trainingData.cache()
+								//  testData.cache()
 
-																val testData = test_split.rdd.map(row => LabeledPoint(
-																		row.getAs[Double]("label"),
-																		row.getAs[org.apache.spark.mllib.linalg.Vector]("features")
-																		))
+								// Train a DecisionTree model.
+								//  Empty categoricalFeaturesInfo indicates all features are continuous.
 
-																		//  trainingData.cache()
-																		//  testData.cache()
+								val randomForestAlgorithmObj = new RandomForestAlgorithm()
 
-																		// Train a DecisionTree model.
-																		//  Empty categoricalFeaturesInfo indicates all features are continuous.
-																		val numClasses = 19
-																		val categoricalFeaturesInfo = Map[Int, Int]()
-																		val impurity = "entropy"
-																		val maxDepth = 3
-																		val maxBins = 5
 
-																		// Random Forest Stuff
-																		val numTrees = 100 // Use more in practice.
-																		val featureSubsetStrategy = "auto" // Let the algorithm choose.
 
-																		val model = RandomForest.trainClassifier(trainingData, numClasses, 
-																				categoricalFeaturesInfo,numTrees, 
-																				featureSubsetStrategy, impurity, maxDepth, maxBins)
+		val model = randomForestAlgorithmObj.getDataModel(trainingData, ApplicationConstants.NUM_CLASSES, 
+				ApplicationConstants.CATEGORICAL_FEATURES_INFO,
+				ApplicationConstants.NUM_TREES, 
+				ApplicationConstants.FEATURE_SUBSET_STRATEGY, 
+				ApplicationConstants.IMPURITY, 
+				ApplicationConstants.MAX_DEPTH, 
+				ApplicationConstants.MAX_BINS)
 
-																				// val model = DecisionTree.trainClassifier(trainingData, numClasses, categoricalFeaturesInfo,
-																				// impurity, maxDepth, maxBins)
+				// val model = DecisionTree.trainClassifier(trainingData, numClasses, categoricalFeaturesInfo,
+						// impurity, maxDepth, maxBins)
 
-																				// Train a GradientBoostedTrees model.
-																				// The defaultParams for Classification use LogLoss by default.
-																				val boostingStrategy = BoostingStrategy.defaultParams("Classification")
-																				boostingStrategy.numIterations = 3 // Note: Use more iterations in practice.
-																				boostingStrategy.treeStrategy.numClasses = 3
-																				boostingStrategy.treeStrategy.maxDepth = 3
-																				// Empty categoricalFeaturesInfo indicates all features are continuous.
-																				boostingStrategy.treeStrategy.categoricalFeaturesInfo = Map[Int, Int]()
+      calculatePredictionAccuracy(testData,model)
 
-																				// val model = GradientBoostedTrees.train(trainingData, boostingStrategy)
+				sc.stop()
+	} // end-main method
 
-																				val labelAndPreds = testData.map { point =>
-																				val prediction = model.predict(point.features)
-																				(point.label, prediction)
-				}
+	def calculatePredictionAccuracy(testData : org.apache.spark.rdd.RDD[org.apache.spark.mllib.regression.LabeledPoint], 
+			                            model    : org.apache.spark.mllib.tree.model.RandomForestModel) = {
 
-				val testErr = labelAndPreds.filter(r => r._1 != r._2).count().toDouble / testData.count()
-						println("Prediction Accuracy ////////////////////////////////////////////// = " + (100-testErr*100) + "%")
-						//  println("Test Error //////////////////////////////////////////////= " + testErr)
-						//println("Learned classification tree model/////////////////////////:\n" + model.toDebugString)
+		val labelAndPreds = testData.map { point =>
+		val prediction = model.predict(point.features)
+		(point.label, prediction)
+		}
 
-						//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-						// Working 107535277
-						// emr_labscorepopulated_data.take(50000).foreach(println)
-
-						sc.stop()
+		val testErr = labelAndPreds.filter(r => r._1 != r._2).count().toDouble / testData.count()
+    
+    val prediction_Accuracy = (100-testErr*100)
+				
+    println("Prediction Accuracy ////////////////////////////////////////////// = " + prediction_Accuracy + "%")
 	}
+  
+  def get_Training_Testing_Data(df_prepared : org.apache.spark.sql.DataFrame): (org.apache.spark.rdd.RDD[org.apache.spark.mllib.regression.LabeledPoint],
+                                                                                  org.apache.spark.rdd.RDD[org.apache.spark.mllib.regression.LabeledPoint]) =
+  {
+    val splits = df_prepared.randomSplit(Array(0.7, 0.3))
+
+        val (training_split, test_split) = (splits(0), splits(1))
+
+        val trainingData = training_split.rdd.map(row => LabeledPoint(
+            row.getAs[Double]("label"),
+            row.getAs[org.apache.spark.mllib.linalg.Vector]("features")
+            ))
+
+       //     println("+++++++++++++++++++++++++++++++++++++++++++++++++++++" + trainingData.count()) 
+
+            val testData = test_split.rdd.map(row => LabeledPoint(
+                row.getAs[Double]("label"),
+                row.getAs[org.apache.spark.mllib.linalg.Vector]("features")
+                ))
+                
+       (trainingData, testData)         
+  } // end get_Training_Testing_Data
 
 }

@@ -6,20 +6,16 @@ import org.apache.spark.SparkContext._
 import org.apache.spark.SparkConf
 import org.apache.spark.rdd.RDD
 
-import com.typesafe.config.ConfigFactory
+import com.objectfrontier.health.analytics.constants.ApplicationConstants
 
 
 object ApplicationSparkContext {
-
-	val config = ConfigFactory.load()
-			val cassandraConnectionHost = config.getString("cassandra.connection.host")
-			val mesosMaster = config.getString("mesos.master")
-
+  
 			val conf = new SparkConf(true)
-	.set("spark.cassandra.connection.host", cassandraConnectionHost)
+	.set("spark.cassandra.connection.host", ApplicationConstants.CASSANDRA_CONNECTION_HOST)
 	.setAppName(this.getClass.getSimpleName)
 	//.setMaster("spark://10.10.40.138:7077")
-	//.setMaster(mesosMaster)
+	//.setMaster(ApplicationConstants.MESO_MASTER)
 
 	val sparkContext = new SparkContext(conf)  
 
