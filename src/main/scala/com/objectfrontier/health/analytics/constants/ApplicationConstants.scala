@@ -7,14 +7,19 @@ object ApplicationConstants {
   
   val Config = ConfigFactory.load()
   
+  // Cassandra Host
   val CASSANDRA_CONNECTION_HOST = Config.getString("cassandra.connection.host")
   
+  // Mesos Master
   val MESO_MASTER = Config.getString("mesos.master")
   
+  // Keyspace
   val KEYSPACE_UCI = Config.getString("keyspace.uci")
   
+  // Table-name
   val UCI_PROTOCOLSUBJECT109 = Config.getString("uci.protocolsubject.109")
   
+  // Decision Tree and Ram Forest Common Parameters
   val NUM_CLASSES = Config.getInt("numClasses")
   
   val CATEGORICAL_FEATURES_INFO = Map[Int, Int]()
@@ -30,5 +35,12 @@ object ApplicationConstants {
   
   val FEATURE_SUBSET_STRATEGY = Config.getString("featureSubsetStrategy") 
   
+  // Algorithm Choice
   val ALGORITM_CHOICE = Config.getString("algorithm.choice") 
+  
+  // Training and Testing Splits
+  val TRAINING_SPLIT_SIZE = Config.getDouble("training.split.size")
+    
+  val TESTING_SPLIT_SIZE  = Config.getDouble("testing.split.size")
+ 
 }

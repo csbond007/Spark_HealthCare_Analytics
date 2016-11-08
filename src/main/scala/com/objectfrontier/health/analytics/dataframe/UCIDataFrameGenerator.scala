@@ -7,95 +7,72 @@ import org.apache.spark.sql.functions.udf
 import org.apache.spark.mllib.linalg.{Vector, Vectors}
 import org.apache.spark.mllib.regression.LabeledPoint
 import com.typesafe.config.ConfigFactory
+import com.objectfrontier.health.analytics.constants.ApplicationConstants
 
 class UCIDataFrameGenerator(sqlCtx:SQLContext,keyspaceName :String, tableName: String) {
 
-	val df = sqlCtx.read
-			.format("org.apache.spark.sql.cassandra")
-			.options(Map( "table" -> tableName, "keyspace" -> keyspaceName))
-			.load()
+    val df = sqlCtx.read
+			             .format("org.apache.spark.sql.cassandra")
+			             .options(Map( "table" -> tableName, "keyspace" -> keyspaceName))
+		             	 .load()
 
-			def getDataFrame() = {
-		df
-	}
-
-
-	def getUCIImputedDataframe() = {
-		// Remove Time_Stamp Column here as it is non-important attribute
-		val df_minus_timestamp = df.drop("time_stamp")
+    def getUCIImputedDataframe() = {
+		
+        // Remove Time_Stamp Column here as it is non-important attribute
+        val df_minus_timestamp = df.drop("time_stamp")
 
 				//Fill the empty column with "NA"
 				val df1 = df_minus_timestamp.na.replace("heart_rate", ImmutableMap.of("NA", "0"));
 
-		//Filter Heart Rate
-		val df_imputed = df1.filter("heart_rate != 0")
+		    //Filter Heart Rate
+		    val df_imputed = df1.filter("heart_rate != 0")
 
 				df_imputed
-	}
+    } // end - getUCIImputedDataframe()  function
 
-	def getUCIPreparedDataframe(df_imputed : org.apache.spark.sql.DataFrame ) = {
+    def encodeLabel=udf((activity_id: Double) => {
+                            activity_id match {
+                                case 1 => 0.0 
+                                case 2 => 1.0
+                                case 3 => 2.0
+                                case 4 => 3.0
+                                case 5 => 4.0
+                                case 6 => 5.0
+                                case 7 => 6.0
+                                case 9 => 7.0
+                                case 10 => 8.0
+                                case 11 => 9.0
+                                case 12 => 10.0
+                                case 13 => 11.0
+                                case 16 => 12.0
+                                case 17 => 13.0
+                                case 18 => 14.0
+                                case 19 => 15.0
+                                case 20 => 16.0
+                                case 24 => 17.0
+                              //case 0 => 18.0
+                                case _ => 18.0
+                       }}) // end - udf - encodeLabel function
+    
+    def convert2Vector =udf((heart_rate: Double,
+                     IMU_hand_temperature: Double) => {
+                                                        Vectors.dense(heart_rate,
+                                                                      IMU_hand_temperature)})  // end - udf - convert2Vector function
+       
+                                                                      
+    def getUCIPreparedDataframe(df_imputed : org.apache.spark.sql.DataFrame ) = {
 
-		def encodeLabel=udf((activity_id: Double) => {
-			activity_id match {
-			case 1 => 0.0 
-			case 2 => 1.0
-			case 3 => 2.0
-			case 4 => 3.0
-			case 5 => 4.0
-			case 6 => 5.0
-			case 7 => 6.0
-			case 9 => 7.0
-			case 10 => 8.0
-			case 11 => 9.0
-			case 12 => 10.0
-			case 13 => 11.0
-			case 16 => 12.0
-			case 17 => 13.0
-			case 18 => 14.0
-			case 19 => 15.0
-			case 20 => 16.0
-			case 24 => 17.0
-			//case 0 => 18.0
-			case _ => 18.0
-			}})
+		      val df_prepared = df_imputed.withColumn(
+										                              "features",
+										                               convert2Vector(
+												                                          df_imputed("heart_rate"),
+												                                          df_imputed("IMU_hand_temperature"))
+										                                              )
+                                      .withColumn("label", encodeLabel(df_imputed("activity_id")))
+										                  .select("features", "label")
 
-			def toVec4 =udf((heart_rate: Double,
-					IMU_hand_temperature: Double) => {
-						Vectors.dense(heart_rate,
-								IMU_hand_temperature)})
+					 df_prepared
 
-
-								val df_prepared = df_imputed.withColumn(
-										"features",
-										toVec4(
-												df_imputed("heart_rate"),
-												df_imputed("IMU_hand_temperature"))
-										).withColumn("label", encodeLabel(df_imputed("activity_id")))
-										.select("features", "label")
-
-										df_prepared
-
-	}
-  
-  def getTrainingAndTestingData(df_prepared : org.apache.spark.sql.DataFrame): (org.apache.spark.rdd.RDD[org.apache.spark.mllib.regression.LabeledPoint],
-      org.apache.spark.rdd.RDD[org.apache.spark.mllib.regression.LabeledPoint]) =
-    {
-    val splits = df_prepared.randomSplit(Array(0.7, 0.3))
-
-        val (training_split, test_split) = (splits(0), splits(1))
-
-        val trainingData = training_split.rdd.map(row => LabeledPoint(
-            row.getAs[Double]("label"),
-            row.getAs[org.apache.spark.mllib.linalg.Vector]("features")
-            ))
-
-            //     println("+++++++++++++++++++++++++++++++++++++++++++++++++++++" + trainingData.count()) 
-
-            val testData = test_split.rdd.map(row => LabeledPoint(
-                row.getAs[Double]("label"),
-                row.getAs[org.apache.spark.mllib.linalg.Vector]("features")
-                ))
-
-                (trainingData, testData)         
-    } // end get_Training_Testing_Data
-}
+	  } // end - getUCIPreparedDataframe function
+   
+} // end - class - UCIDataFrameGenerator
