@@ -19,4 +19,19 @@ class RandomForestAlgorithm {
 
 		model
 	}
+  
+  def calculateRandomForestPredictionAccuracy(testData : org.apache.spark.rdd.RDD[org.apache.spark.mllib.regression.LabeledPoint], 
+      model    : org.apache.spark.mllib.tree.model.RandomForestModel) = {
+
+    val labelAndPreds = testData.map { point =>
+    val prediction = model.predict(point.features)
+    (point.label, prediction)
+    }
+
+    val testErr = labelAndPreds.filter(r => r._1 != r._2).count().toDouble / testData.count()
+
+        val prediction_Accuracy = (100-testErr*100)
+
+        println("RandomForestAlgorithm Prediction Accuracy ////////////////////////////////////////////// = " + prediction_Accuracy + "%")
+  }
 } 

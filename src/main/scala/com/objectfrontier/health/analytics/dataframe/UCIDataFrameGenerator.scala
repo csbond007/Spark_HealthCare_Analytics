@@ -5,8 +5,10 @@ import org.apache.spark.sql.DataFrame
 import com.google.common.collect.ImmutableMap
 import org.apache.spark.sql.functions.udf
 import org.apache.spark.mllib.linalg.{Vector, Vectors}
+import org.apache.spark.mllib.regression.LabeledPoint
+import com.typesafe.config.ConfigFactory
 
-class DataFrameGenerator(sqlCtx:SQLContext,keyspaceName :String, tableName: String) {
+class UCIDataFrameGenerator(sqlCtx:SQLContext,keyspaceName :String, tableName: String) {
 
 	val df = sqlCtx.read
 			.format("org.apache.spark.sql.cassandra")
@@ -74,4 +76,26 @@ class DataFrameGenerator(sqlCtx:SQLContext,keyspaceName :String, tableName: Stri
 										df_prepared
 
 	}
+  
+  def getTrainingAndTestingData(df_prepared : org.apache.spark.sql.DataFrame): (org.apache.spark.rdd.RDD[org.apache.spark.mllib.regression.LabeledPoint],
+      org.apache.spark.rdd.RDD[org.apache.spark.mllib.regression.LabeledPoint]) =
+    {
+    val splits = df_prepared.randomSplit(Array(0.7, 0.3))
+
+        val (training_split, test_split) = (splits(0), splits(1))
+
+        val trainingData = training_split.rdd.map(row => LabeledPoint(
+            row.getAs[Double]("label"),
+            row.getAs[org.apache.spark.mllib.linalg.Vector]("features")
+            ))
+
+            //     println("+++++++++++++++++++++++++++++++++++++++++++++++++++++" + trainingData.count()) 
+
+            val testData = test_split.rdd.map(row => LabeledPoint(
+                row.getAs[Double]("label"),
+                row.getAs[org.apache.spark.mllib.linalg.Vector]("features")
+                ))
+
+                (trainingData, testData)         
+    } // end get_Training_Testing_Data
 }

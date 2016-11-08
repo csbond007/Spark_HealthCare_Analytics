@@ -29,4 +29,6 @@ object ApplicationConstants {
   val NUM_TREES = Config.getInt("numTrees")
   
   val FEATURE_SUBSET_STRATEGY = Config.getString("featureSubsetStrategy") 
+  
+  val ALGORITM_CHOICE = Config.getString("algorithm.choice") 
 }
